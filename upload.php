@@ -5,138 +5,96 @@ $user = "root";
 $password = "";
 $dbname = "upload_surat";
 
-session_start();
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'satker') {
-    header("Location: login.php");
-    exit;
-}
-
 $conn = new mysqli($host, $user, $password, $dbname);
 
 if ($conn->connect_error) {
     die("Koneksi gagal: " . $conn->connect_error);
 }
 
-// Buat tabel jika belum ada
-$sql = "CREATE TABLE IF NOT EXISTS surat (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nama_surat VARCHAR(255) NOT NULL,
-    nama_pengirim VARCHAR(255) NOT NULL,
-    satker VARCHAR(255) NOT NULL,
-    kode_satker VARCHAR(10) NOT NULL,
-    file_path VARCHAR(255) NOT NULL,
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)";
-
-if (!$conn->query($sql)) {
-    die("Error membuat tabel: " . $conn->error);
-}
-
-// Proses upload file jika ada permintaan POST
+// Proses upload file
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $jenis_koreksi = htmlspecialchars($_POST['jenis_koreksi']);
     $nama_surat = htmlspecialchars($_POST['nama_surat']);
     $nama_pengirim = htmlspecialchars($_POST['nama_pengirim']);
     $satker = htmlspecialchars($_POST['satker']);
-    $kode_satker = htmlspecialchars($_POST['kode_satker']);
+    $akun_semula = htmlspecialchars($_POST['akun_semula']);
+    $akun_menjadi = htmlspecialchars($_POST['akun_menjadi']);
+    $nilai_koreksi = htmlspecialchars($_POST['nilai_koreksi']);
     $file = $_FILES['file_surat'];
 
-    // Validasi file upload
+    // **USER ID HARUS ADA**
+    $user_id = 4; // Ganti dengan user yang sedang login (contoh)
+
+    // **CEK APAKAH USER ID VALID**
+    $userCheck = $conn->prepare("SELECT id FROM users WHERE id = ?");
+    $userCheck->bind_param("i", $user_id);
+    $userCheck->execute();
+    $userCheck->store_result();
+
+    if ($userCheck->num_rows === 0) {
+        echo "<div class='alert alert-danger'>User ID tidak valid.</div>";
+        exit;
+    }
+    
     if ($file['error'] === UPLOAD_ERR_OK) {
         $targetDir = "uploads/";
         $uniqueFileName = uniqid() . "_" . basename($file['name']);
         $targetFile = $targetDir . $uniqueFileName;
 
-        // Cek apakah folder "uploads" ada, jika tidak buat foldernya
+        // Buat folder uploads jika belum ada
         if (!is_dir($targetDir)) {
             mkdir($targetDir, 0777, true);
         }
 
-        // Hanya izinkan file PDF
+        // Cek hanya menerima file PDF
         $fileType = strtolower(pathinfo($targetFile, PATHINFO_EXTENSION));
         if ($fileType !== 'pdf') {
             echo "<div class='alert alert-danger'>Hanya file PDF yang diperbolehkan.</div>";
         } else {
-            // Pindahkan file ke folder target
             if (move_uploaded_file($file['tmp_name'], $targetFile)) {
-                // Simpan informasi ke database
-                $stmt = $conn->prepare("INSERT INTO surat (nama_surat, nama_pengirim, satker, kode_satker, file_path) VALUES (?, ?, ?, ?, ?)");
-                $stmt->bind_param("sssss", $nama_surat, $nama_pengirim, $satker, $kode_satker, $targetFile);
+                // Masukkan ke database dengan user_id
+                $stmt = $conn->prepare("INSERT INTO surat (user_id, jenis_koreksi, nama_surat, nama_pengirim, satker, akun_semula, akun_menjadi, nilai_koreksi, file_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("issssssds", $user_id, $jenis_koreksi, $nama_surat, $nama_pengirim, $satker, $akun_semula, $akun_menjadi, $nilai_koreksi, $targetFile);
 
                 if ($stmt->execute()) {
-                    echo "<div class='alert alert-success'>Surat berhasil diunggah.</div>";
+                    echo "<div class='alert alert-success'>Surat berhasil diupload.</div>";
                 } else {
-                    echo "<div class='alert alert-danger'>Gagal menyimpan data ke database: " . $stmt->error . "</div>";
+                    echo "<div class='alert alert-danger'>Terjadi kesalahan saat mengupload surat.</div>";
                 }
-                $stmt->close();
             } else {
-                echo "<div class='alert alert-danger'>Gagal mengunggah file.</div>";
+                echo "<div class='alert alert-danger'>Terjadi kesalahan saat mengupload file.</div>";
             }
         }
     } else {
-        echo "<div class='alert alert-danger'>Terjadi kesalahan saat mengunggah file.</div>";
+        echo "<div class='alert alert-danger'>Tidak ada file yang diupload atau terjadi kesalahan.</div>";
     }
 }
 $conn->close();
 ?>
 
+
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aplikasi KPPN Kolaka</title>
-    <!-- Bootstrap CSS -->
+    <title>Upload Surat Koreksi - KPPN Kolaka</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
             color: #000;
-            overflow-x: hidden;
-            height: 100%;
             background-image: url("https://i.imgur.com/GMmCQHC.png");
             background-repeat: no-repeat;
-            background-size: 100% 100%;
+            background-size: cover;
         }
         .card {
             padding: 30px 40px;
             margin-top: 60px;
-            margin-bottom: 60px;
-            border: none !important;
+            border: none;
             box-shadow: 0 6px 12px 0 rgba(0,0,0,0.2);
         }
         .blue-text {
             color: #00BCD4;
-        }
-        .form-control-label {
-            margin-bottom: 0;
-        }
-        input, textarea, button {
-            padding: 8px 15px;
-            border-radius: 5px !important;
-            margin: 5px 0px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            font-size: 18px !important;
-            font-weight: 300;
-        }
-        input:focus, textarea:focus {
-            box-shadow: none !important;
-            border: 1px solid #00BCD4;
-            outline-width: 0;
-            font-weight: 400;
-        }
-        .btn-block {
-            text-transform: uppercase;
-            font-size: 15px !important;
-            font-weight: 400;
-            height: 43px;
-            cursor: pointer;
-        }
-        .btn-block:hover {
-            color: #fff !important;
-        }
-        button:focus {
-            box-shadow: none !important;
-            outline-width: 0;
         }
         .logout-btn {
             position: absolute;
@@ -147,7 +105,6 @@ $conn->close();
             border: none;
             padding: 10px 20px;
             cursor: pointer;
-            font-size: 16px;
             border-radius: 5px;
         }
         .logout-btn:hover {
@@ -156,53 +113,55 @@ $conn->close();
     </style>
 </head>
 <body>
-    <button class="logout-btn" onclick="window.location.href='login.php';">Logout</button>
-    <div class="container-fluid px-1 py-5 mx-auto">
-        <div class="row d-flex justify-content-center">
-            <div class="col-xl-7 col-lg-8 col-md-9 col-11 text-center">
-                <h3>Upload Surat Penonaktifan Supplier</h3>
-                <p class="blue-text">Mohon isi data di bawah ini untuk mengunggah surat penonaktifan supplier</p>
+    <button class="logout-btn" onclick="window.location.href='index.php';">Logout</button>
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
                 <div class="card">
-                    <h5 class="text-center mb-4">Form Permohonan Surat</h5>
+                    <h3 class="text-center">Upload Surat Permohonan Koreksi</h3>
+                    <p class="blue-text text-center">Mohon isi data berikut untuk mengunggah surat Permohonan</p>
                     <form action="" method="POST" enctype="multipart/form-data">
-                        <div class="row justify-content-between text-left">
-                            <div class="form-group col-sm-6 flex-column d-flex">
-                                <label class="form-control-label px-3">Nomor Surat<span class="text-danger"> *</span></label>
-                                <input type="text" id="nama_surat" name="nama_surat" placeholder="" required>
-                            </div>
-                            <div class="form-group col-sm-6 flex-column d-flex">
-                                <label class="form-control-label px-3">Nama Pengirim<span class="text-danger"> *</span></label>
-                                <input type="text" id="nama_pengirim" name="nama_pengirim" placeholder="" required>
-                            </div>
+                        <div class="form-group">
+                            <label>Jenis Koreksi <span class="text-danger">*</span></label>
+                            <select name="jenis_koreksi" class="form-control" required>
+                                <option value="" disabled selected>Pilih Jenis Koreksi</option>
+                                <option value="koreksi_penerimaan">Koreksi Penerimaan</option>
+                                <option value="koreksi_spm">Koreksi SPM</option>
+                            </select>
                         </div>
-                        <div class="row justify-content-between text-left">
-                            <div class="form-group col-sm-6 flex-column d-flex">
-                                <label class="form-control-label px-3">Satker<span class="text-danger"> *</span></label>
-                                <input type="text" id="satker" name="satker" placeholder="" required>
-                            </div>
-                            <div class="form-group col-sm-6 flex-column d-flex">
-                                <label class="form-control-label px-3">Kode Satker<span class="text-danger"> *</span></label>
-                                <input type="text" id="kode_satker" name="kode_satker" placeholder="" required>
-                            </div>
+                        <div class="form-group">
+                            <label>Nama Satker <span class="text-danger">*</span></label>
+                            <input type="text" name="satker" class="form-control" required>
                         </div>
-                        <div class="row justify-content-between text-left">
-                            <div class="form-group col-12 flex-column d-flex">
-                                <label class="form-control-label px-3">File Surat (PDF)<span class="text-danger"> *</span></label>
-                                <input type="file" id="file_surat" name="file_surat" accept=".pdf" required>
-                            </div>
+                        <div class="form-group">
+                            <label>Kode Satker <span class="text-danger">*</span></label>
+                            <input type="text" name="nama_pengirim" class="form-control" required>
                         </div>
-                        <div class="row justify-content-end">
-                            <div class="form-group col-sm-6">
-                                <button type="submit" class="btn-block btn-primary">Upload</button>
-                            </div>
+                        <div class="form-group">
+                            <label>Nomor Surat <span class="text-danger">*</span></label>
+                            <input type="text" name="nama_surat" class="form-control" required>
                         </div>
+                        <div class="form-group">
+                            <label>Akun Semula <span class="text-danger">*</span></label>
+                            <input type="text" name="akun_semula" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Akun Menjadi <span class="text-danger">*</span></label>
+                            <input type="text" name="akun_menjadi" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Nilai Koreksi (Rp) <span class="text-danger">*</span></label>
+                            <input type="number" name="nilai_koreksi" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>File Surat Permohonan Koreksi dari Satker (PDF) <span class="text-danger">*</span></label>
+                            <input type="file" name="file_surat" class="form-control" accept=".pdf" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Upload</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
-    <!-- Bootstrap JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

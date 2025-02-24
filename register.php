@@ -121,8 +121,9 @@ $conn->close();
                                     <div class="mb-4">
                                         <label class="form-label" for="role">Pilih Role</label>
                                         <select class="form-select" name="role" required>
-                                            <option value="satker">Satker</option>
-                                            <option value="kppn">Admin</option>
+                                            <option value="veraki">MPHLBJS</option>
+                                            <option value="satker">Permohonan</option>
+                                            <option value="kppn">Tanggapan Koreksi</option>
                                         </select>
                                     </div>
 
@@ -138,7 +139,7 @@ $conn->close();
 
                                     <!-- Additional Links -->
                                     <div class="text-center">
-                                        <p>Sudah punya akun? <a href="login.php">Login</a></p>
+                                        <p>Sudah punya akun? <a href="index.php">Login</a></p>
                                     </div>
                                 </form>
                             </div>
